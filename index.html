@@ -1,0 +1,1890 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Implementación Polivirtual en TBC Oaxaca</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
+
+  <style>
+    :root {
+      --ipn-guinda: #6A1B31;
+      --ipn-dorado: #D4AF37;
+      --tbc-verde: #27ae60;
+      --bg-color: #f4f6f9;
+      --text-main: #2c3e50;
+    }
+
+    body {
+      font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      overflow: hidden;
+    }
+
+    .header {
+      background: linear-gradient(135deg, var(--ipn-guinda), #4a1322);
+      color: white;
+      padding: 15px 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+      z-index: 1000;
+      position: relative;
+    }
+
+    .header h1 {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 600;
+    }
+
+    .header p {
+      margin: 5px 0 0 0;
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    .stats-container {
+      display: flex;
+      gap: 15px;
+    }
+
+    .stat-box {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 8px 15px;
+      border-radius: 8px;
+      text-align: center;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .stat-box.highlight {
+      background: rgba(212, 175, 55, 0.2);
+      border-color: var(--ipn-dorado);
+    }
+
+    .stat-box .num {
+      font-size: 18px;
+      font-weight: bold;
+      display: block;
+    }
+
+    .stat-box .label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .main-container {
+      display: flex;
+      padding: 15px;
+      gap: 15px;
+      height: calc(100vh - 84px);
+      box-sizing: border-box;
+    }
+
+    #map {
+      flex: 1;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      z-index: 1;
+    }
+
+    .panel-lateral {
+      width: 340px;
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .panel-title {
+      color: var(--ipn-guinda);
+      border-bottom: 2px solid var(--ipn-dorado);
+      padding-bottom: 10px;
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .beneficio-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .beneficio-icon {
+      background: rgba(106, 27, 49, 0.1);
+      color: var(--ipn-guinda);
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .beneficio-text h4 {
+      margin: 0 0 4px 0;
+      font-size: 13px;
+      color: #34495e;
+    }
+
+    .beneficio-text p {
+      margin: 0;
+      font-size: 12px;
+      color: #7f8c8d;
+      line-height: 1.4;
+    }
+
+    .legend {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 8px;
+      border: 1px solid #e9ecef;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .legend-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* Sede Piloto Estática (Guinda destacado con borde blanco grueso) */
+    .pulse-marker {
+      background: var(--ipn-guinda);
+      border-radius: 50%;
+      border: 3px solid white;
+      box-shadow: 0 0 10px rgba(106, 27, 49, 0.4);
+    }
+
+    /* Estilos para controles y capas */
+    .leaflet-control-layers {
+      border-radius: 8px !important;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.15) !important;
+      border: none !important;
+      font-family: 'Segoe UI', sans-serif;
+      font-size: 13px;
+    }
+
+    /* Estilos Popup Leaflet */
+    .leaflet-popup-content-wrapper {
+      border-radius: 8px;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    .leaflet-popup-content {
+      margin: 0;
+    }
+
+    .popup-header {
+      background: var(--ipn-guinda);
+      color: white;
+      padding: 10px 15px;
+      font-weight: bold;
+      font-size: 14px;
+    }
+
+    .popup-header.tbc {
+      background: var(--tbc-verde);
+    }
+
+    .popup-body {
+      padding: 15px;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .popup-body b {
+      color: #555;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 10px;
+      font-weight: bold;
+      background: #eee;
+      margin-top: 8px;
+      margin-right: 5px;
+    }
+
+    .badge.ipn {
+      background: rgba(106, 27, 49, 0.1);
+      color: var(--ipn-guinda);
+    }
+
+    /* Modal Polivirtual HTML/CSS */
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.6); backdrop-filter: blur(3px);
+      z-index: 9999; display: none; justify-content: center; align-items: center;
+      opacity: 0; transition: opacity 0.3s ease;
+    }
+    .modal-overlay.active { display: flex; opacity: 1; }
+    .modal-content {
+      background: white; width: 90%; max-width: 850px; max-height: 85vh;
+      border-radius: 12px; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+      position: relative; transform: translateY(20px); transition: transform 0.3s ease;
+      font-family: 'Segoe UI', sans-serif;
+    }
+    .modal-overlay.active .modal-content { transform: translateY(0); }
+    .modal-header {
+      background: var(--ipn-guinda); color: white; padding: 20px 30px;
+      position: sticky; top: 0; z-index: 10; display: flex;
+      justify-content: space-between; align-items: center; border-bottom: 4px solid var(--ipn-dorado);
+    }
+    .modal-header h2 { margin: 0; font-size: 22px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+    .close-btn { background: none; border: none; color: white; font-size: 28px; cursor: pointer; transition: color 0.2s; }
+    .close-btn:hover { color: var(--ipn-dorado); }
+    .modal-body { padding: 30px; color: #333; }
+    
+    .modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+    .modal-section { background: #f9f9f9; padding: 20px; border-radius: 8px; border-left: 4px solid var(--ipn-dorado); }
+    .modal-section h3 { margin-top: 0; color: var(--ipn-guinda); font-size: 16px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+    .modal-section ul { margin: 0; padding-left: 20px; font-size: 13px; line-height: 1.6; }
+    .modal-section p { font-size: 13px; margin-top: 0; line-height: 1.5; }
+    
+    .btn-detalle {
+      display: block; width: 100%; padding: 10px; margin-top: 15px;
+      background: var(--ipn-guinda); color: white; border: none; border-radius: 6px;
+      cursor: pointer; font-weight: bold; transition: background 0.2s;
+    }
+    .btn-detalle:hover { background: #4a1322; }
+    @media (max-width: 768px) { .modal-grid { grid-template-columns: 1fr; } }
+    
+    /* Etiquetas de distancia permanentes */
+    .dist-label {
+      background: rgba(255,255,255,0.85); border: 1px solid #8e44ad;
+      color: #2c3e50; font-size: 9px; font-weight: bold; padding: 2px 4px;
+      border-radius: 4px; box-shadow: none; text-align: center;
+      white-space: nowrap !important; line-height: 1;
+      margin-top: -10px !important; margin-left: -20px !important;
+    }
+    .dist-label.sim { border-color: #3498db; color: #1a5276; }
+    .dist-label::before { display: none !important; }
+  </style>
+</head>
+
+<body>
+  <div class="header">
+    <div>
+      <h1>Expansión Educativa: TBC y Polivirtual</h1>
+      <p>Estrategia de implementación tecnológica y Educación a Distancia</p>
+    </div>
+    <div class="stats-container">
+      <div class="stat-box">
+        <span class="num">102</span>
+        <span class="label">Planteles TBC</span>
+      </div>
+      <div class="stat-box highlight">
+        <span class="num">4</span>
+        <span class="label">Sedes Polivirtual</span>
+      </div>
+      <div class="stat-box">
+        <span class="num">~5,100</span>
+        <span class="label">Alumnos de Impacto</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="main-container">
+    <!-- PANELES LATERALES -->
+    <div class="panel-lateral">
+      <h3 class="panel-title"><i class="fas fa-bullseye"></i> Beneficios del Proyecto</h3>
+
+      <div class="beneficio-item">
+        <div class="beneficio-icon"><i class="fas fa-graduation-cap"></i></div>
+        <div class="beneficio-text">
+          <h4>Educación Superior Accesible</h4>
+          <p>Acceso directo a licenciaturas y carreras técnicas del IPN sin abandonar su comunidad.</p>
+        </div>
+      </div>
+      <div class="beneficio-item">
+        <div class="beneficio-icon"><i class="fas fa-network-wired"></i></div>
+        <div class="beneficio-text">
+          <h4>Reducción de Brecha Digital</h4>
+          <p>Aulas conectadas y equipadas para el aprendizaje virtual del más alto nivel.</p>
+        </div>
+      </div>
+      <div class="beneficio-item">
+        <div class="beneficio-icon"><i class="fas fa-home"></i></div>
+        <div class="beneficio-text">
+          <h4>Retención Estudiantil</h4>
+          <p>Mitigación de los altos costos y riesgos de migración hacia zonas urbanas.</p>
+        </div>
+      </div>
+
+      <div style="flex-grow: 1;"></div> <!-- Empuja la leyenda abajo -->
+
+      <!-- Herramienta DSS (Toma de Decisiones) -->
+      <div class="simulador-box" style="background:#fff; padding:15px; border-radius:8px; border:1px solid #ddd; border-left:4px solid #3498db; margin-bottom:15px; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
+        <h4 style="margin-top:0; margin-bottom:8px; font-size:14px; color:var(--ipn-guinda);">
+          <i class="fas fa-magic"></i> Simulador de Sedes
+        </h4>
+        <p style="font-size:11px; color:#555; margin-bottom:8px; line-height:1.4;">
+          Haz clic en el mapa para evaluar el impacto de abrir un Polivirtual allí.
+        </p>
+        <div style="margin-bottom:12px;">
+          <label style="font-size:10px; color:#555; display:block; margin-bottom:4px; font-weight:bold;">Radio de Impacto (Buffer):</label>
+          <select id="radioSimulacion" style="width:100%; padding:5px; border-radius:4px; border:1px solid #ccc; font-size:11px; color:#333;">
+            <option value="10000">10 km (Conurbado / Local)</option>
+            <option value="20000">20 km (Regional Cercano)</option>
+            <option value="30000" selected>30 km (Óptimo / Recomendado)</option>
+            <option value="40000">40 km (Cobertura Ampliada)</option>
+            <option value="50000">50 km (Máximo / Distrito)</option>
+          </select>
+        </div>
+        <button id="btnSimular" class="btn-simular" onclick="toggleSimulacion()" style="width:100%; background:#ecf0f1; color:#333; border:1px solid #bdc3c7; border-radius:5px; padding:8px; font-weight:bold; cursor:pointer; font-size:12px; transition:0.2s;">
+          <i class="fas fa-map-marker-alt"></i> Activar Modo Simulación
+        </button>
+        <style>
+          .btn-simular:hover { background: #e0e6ed !important; }
+          .btn-simular.active { background: #3498db !important; color: white !important; border-color: #2980b9 !important; box-shadow: 0 0 8px rgba(52, 152, 219, 0.4) !important; }
+        </style>
+      </div>
+
+      <div class="legend">
+        <h4 style="margin-top: 0; margin-bottom: 12px; font-size: 13px; color: #444;">Simbología</h4>
+        <div class="legend-item">
+          <div class="legend-dot" style="background: var(--tbc-verde);"></div>
+          <span>Plantel Telebachillerato Comunitario</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background: var(--ipn-guinda);"></div>
+          <span>Sede Polivirtual (IPN)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background: var(--ipn-guinda); border: 2px solid white; box-shadow: 0 0 5px rgba(106, 27, 49, 0.4); width: 14px; height: 14px; box-sizing: border-box;"></div>
+          <span>Polivirtual en tu municipio</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background: rgba(106, 27, 49, 0.1); border: 1px dashed var(--ipn-guinda);">
+          </div>
+          <span>Zona de Cobertura e Influencia (30km)</span>
+        </div>
+        <div class="legend-item">
+          <div style="width: 14px; height: 3px; background: #8e44ad; border-bottom: 2px dashed rgba(255,255,255,0.7); margin-right: 8px; flex-shrink: 0;"></div>
+          <span>Red Estratégica (Conexión a Sede IDEAL)</span>
+        </div>
+        <p style="font-size: 10px; color: #888; margin: 10px 0 0 0; font-style: italic;">
+          Nota: Los marcadores dorados representan la fase inicial supervisada.
+        </p>
+      </div>
+    </div>
+
+    <!-- CONTENEDOR DEL MAPA -->
+    <div id="map"></div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+    // CONFIGURACIÓN: Ingresa aquí el nombre exacto de tu municipio (debe coincidir con la lista de datos)
+    const MI_MUNICIPIO_IMPLEMENTACION = "TLACOLULA DE MATAMOROS";
+
+    const map = L.map("map", { zoomControl: false }).setView([17.0732, -96.7266], 7);
+
+    // Agregar controles de zoom en otra posición si se desea
+    L.control.zoom({ position: 'topright' }).addTo(map);
+
+    // Mapa base más limpio estilo "CartoDB" para dar apariencia corporativa
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+      attribution: "© OpenStreetMap contributors © CARTO",
+      subdomains: 'abcd',
+      maxZoom: 20
+    }).addTo(map);
+
+    // 3. Tus datos (Arreglo de planteles)
+    const planteles = [
+      {
+        id: 1,
+        nombre: "TBC 01",
+        localidad: "MONJAS",
+        municipio: "MONJAS",
+        distrito: "MIAHUATLAN",
+        region: "SIERRA SUR",
+        responsable: "MANUEL CRUZ SOSA",
+        lat: 16.3989,
+        lng: -96.6347,
+      },
+      {
+        id: 2,
+        nombre: "TBC 02",
+        localidad: "GUADALUPE VICTORIA",
+        municipio: "SAN CARLOS YAUTEPEC",
+        distrito: "YAUTEPEC",
+        region: "SIERRA SUR",
+        responsable: "SONIA ILCE MERLIN ALVAREZ",
+        lat: 16.5167,
+        lng: -95.95,
+      },
+      {
+        id: 3,
+        nombre: "TBC 03",
+        localidad: "SAN JUAN BAUTISTA JAYACATLAN",
+        municipio: "ETLA",
+        distrito: "SAN JUAN BAUTISTA JAYACATLAN",
+        region: "VALLES CENTRALES",
+        responsable: "MARCOS ANTΟΝΙΟ ISIDRO TENORIO",
+        lat: 17.4331,
+        lng: -96.8333,
+      },
+      {
+        id: 4,
+        nombre: "TBC 04",
+        localidad: "SAN JUAN TEPEUXILA",
+        municipio: "SAN JUAN TEPEUXILA",
+        distrito: "CUICATLAN",
+        region: "CAÑADA",
+        responsable: "URIEL CORTES MATA",
+        lat: 17.7128,
+        lng: -96.795,
+      },
+      {
+        id: 5,
+        nombre: "TBC 05",
+        localidad: "SAN ANTONIO CUAJIMOLOYAS",
+        municipio: "SAN MIGUEL AMATLÁN",
+        distrito: "IXTLAN DE JUÁREZ",
+        region: "SIERRA NORTE",
+        responsable: "BERNABÉ GERVACIO ANDRADE LÓPEZ",
+        lat: 17.1139,
+        lng: -96.4489,
+      },
+      {
+        id: 6,
+        nombre: "TBC 06",
+        localidad: "SAN PEDRO YOLOX",
+        municipio: "SAN PEDRO YOLOX",
+        distrito: "IXTLAN DE JUÁREZ",
+        region: "SIERRA NORTE",
+        responsable: "FRANCISCO DE JESÚS BASILIO JUAN",
+        lat: 17.6167,
+        lng: -96.5333,
+      },
+      {
+        id: 7,
+        nombre: "TBC 07",
+        localidad: "SANTO DOMINGO OZOLOTEPEC",
+        municipio: "SANTO DOMINGO OZOLOTEPEC",
+        distrito: "MIAHUATLAN",
+        region: "SIERRA SUR",
+        responsable: "JOSÉ LUIS MENDOZA BETANZOS",
+        lat: 16.1472,
+        lng: -96.2422,
+      },
+      {
+        id: 8,
+        nombre: "TBC 08",
+        localidad: "LAS HUERTAS",
+        municipio: "SOLA DE VEGA",
+        distrito: "SANTO DOMINGO TEOJOMULCO",
+        region: "SIERRA SUR",
+        responsable: "EDSON OMAR MARTINEZ AQUINO",
+        lat: 16.5133,
+        lng: -96.9744,
+      },
+      {
+        id: 9,
+        nombre: "TBC 09",
+        localidad: "SANTO DOMINGO JALIEZA",
+        municipio: "OCOTLAN",
+        distrito: "SANTO TOMÁS JALIEZA",
+        region: "VALLES CENTRALES",
+        responsable: "FERNANDO HERNÁNDEZ RAMOS",
+        lat: 16.85,
+        lng: -96.65,
+      },
+      {
+        id: 10,
+        nombre: "TBC 10",
+        localidad: "SAN JUAN DEL RÍO",
+        municipio: "SAN JUAN DEL RÍO",
+        distrito: "TLACOLULA",
+        region: "VALLES CENTRALES",
+        responsable: "MARÍA DEL CARMEN ZÁRATE PÉREZ",
+        lat: 16.8917,
+        lng: -96.1556,
+      },
+
+      {
+        id: 11,
+        nombre: "TBC 11",
+        localidad: "LOS HORCONES",
+        municipio: "CANDELARIA LOXICHA",
+        distrito: "POCHUTLA",
+        region: "COSTA",
+        responsable: "MERCEDES MAGNOLIA MONTEALEGRE BRACAMONTES",
+        lat: 15.9142,
+        lng: -96.535,
+      },
+      {
+        id: 12,
+        nombre: "TBC 12",
+        localidad: "LA TOMA",
+        municipio: "MAZATLAN VILLA DE FLORES",
+        distrito: "TEOTITLÁN",
+        region: "CAÑADA",
+        responsable: "BASILO ROMERO ORTIZ",
+        lat: 18.0161,
+        lng: -96.9458,
+      },
+      {
+        id: 13,
+        nombre: "TBC 13",
+        localidad: "MIXISTLAN DE LA REFORMA",
+        municipio: "MIXE",
+        distrito: "MIXISTLAN DE LA REFORMA",
+        region: "SIERRA NORTE",
+        responsable: "MARTIN ROSALES GUTIERREZ",
+        lat: 17.1306,
+        lng: -96.0714,
+      },
+      {
+        id: 14,
+        nombre: "TBC 14",
+        localidad: "PASO ANCHO",
+        municipio: "POCHUTLA",
+        distrito: "SAN BARTOLOME LOXICHA",
+        region: "COSTA",
+        responsable: "ALEJANDRO RAMIREZ ELORZA",
+        lat: 15.9325,
+        lng: -96.6583,
+      },
+      {
+        id: 15,
+        nombre: "TBC 15",
+        localidad: "AGUA COLORADA",
+        municipio: "TEOTITLAN",
+        distrito: "SAN JOSÉ TENANGO",
+        region: "CAÑADA",
+        responsable: "ISABEL FELIX SANTIAGO",
+        lat: 18.1561,
+        lng: -96.7119,
+      },
+      {
+        id: 16,
+        nombre: "TBC 16",
+        localidad: "EL ZACATAL",
+        municipio: "JUCHITAN",
+        distrito: "SAN JUAN GUI CHICOVI",
+        region: "ISTMO",
+        responsable: "CONSTANTINO CANALES GIJON",
+        lat: 17.2069,
+        lng: -95.0347,
+      },
+      {
+        id: 17,
+        nombre: "TBC 17",
+        localidad: "PLAN DE SAN LUIS",
+        municipio: "JUCHITAN",
+        distrito: "SAN JUAN GUICHICOVI",
+        region: "ISTMO",
+        responsable: "ASTRID MUMENTHEY JACINTO",
+        lat: 17.1472,
+        lng: -95.0683,
+      },
+      {
+        id: 18,
+        nombre: "TBC 18",
+        localidad: "SAN JUAN YAFE",
+        municipio: "SAN JUAN YAEE",
+        distrito: "VILLA ALTA",
+        region: "SIERRA NORTE",
+        responsable: "LINDA TALIA SANTOS TORRES",
+        lat: 17.4331,
+        lng: -96.1758,
+      },
+      {
+        id: 19,
+        nombre: "TBC 19",
+        localidad: "SAN LORENZO VISTA HERMOSA",
+        municipio: "SAN MIGUEL AMATITLAN",
+        distrito: "HUAJUAPAN",
+        region: "MIXTECA",
+        responsable: "GILBERTO ANTΟΝΙΟ CRUZ REYES",
+        lat: 17.9258,
+        lng: -97.915,
+      },
+      {
+        id: 20,
+        nombre: "TBC 20",
+        localidad: "LAS CONCHAS",
+        municipio: "SAN MIGUEL CHIMALAPA",
+        distrito: "JUCHITAN",
+        region: "ISTMO",
+        responsable: "MODESTO SIERRA JOSE",
+        lat: 16.5911,
+        lng: -94.3167,
+      },
+
+      {
+        id: 21,
+        nombre: "TBC 21",
+        localidad: "SAN PEDRO MARTIR QUIECHAPA",
+        municipio: "SAN PEDRO MARTIR QUIECHAPA",
+        distrito: "YAUTEPEC",
+        region: "SIERRA SUR",
+        responsable: "MOISES HERNÁNDEZ HERNANDEZ",
+        lat: 16.4333,
+        lng: -96.25,
+      },
+      {
+        id: 22,
+        nombre: "TBC 22",
+        localidad: "LOS CORAZONES",
+        municipio: "SAN PEDRO TAPANATEPEC",
+        distrito: "JUCHITAN",
+        region: "ISTMO",
+        responsable: "ROSELIA NATAREN GÓMEZ",
+        lat: 16.2047,
+        lng: -94.0881,
+      },
+      {
+        id: 23,
+        nombre: "TBC 23",
+        localidad: "SANTO DOMINGO DEL RÍO",
+        municipio: "CUICATLAN",
+        distrito: "SAN PEDRO TEUTILA",
+        region: "CANADA",
+        responsable: "ANGELA ZANAHUA SANCHEZ",
+        lat: 18.0069,
+        lng: -96.7264,
+      },
+      {
+        id: 24,
+        nombre: "TBC 24",
+        localidad: "SAN JOSE CIENEGUILLA",
+        municipio: "MIAHUATLAN",
+        distrito: "SAN SEBASTIAN COATLAN",
+        region: "SIERRA SUR",
+        responsable: "JUAN SANTIAGO MARCOS",
+        lat: 16.1833,
+        lng: -96.7667,
+      },
+      {
+        id: 25,
+        nombre: "TBC 25",
+        localidad: "SANTA INES DEL MONTE",
+        municipio: "ZAACHILA",
+        distrito: "SANTA INĖS DEL MONTE",
+        region: "VALLES CENTRALES",
+        responsable: "BRENDA CRUZ ANTONIO",
+        lat: 16.9244,
+        lng: -96.8608,
+      },
+      {
+        id: 26,
+        nombre: "TBC 26",
+        localidad: "SANTA MARIA ZAPOTITLAN",
+        municipio: "SANTA MARIA ECATEPEC",
+        distrito: "YAITEPEC",
+        region: "SIERRA SUR",
+        responsable: "BLANCA ELIZABETH PÉREZ LÓPEZ",
+        lat: 16.1667,
+        lng: -95.9167,
+      },
+      {
+        id: 27,
+        nombre: "TBC 27",
+        localidad: "CERRO CONCHA",
+        municipio: "TUX TEPEC",
+        distrito: "SANTA MARÍA JACATEPEC",
+        region: "CUENCA DEL PAPALOAPAN",
+        responsable: "KEILA MARTINEZ",
+        lat: 17.8486,
+        lng: -96.2411,
+      },
+      {
+        id: 28,
+        nombre: "TBC 28",
+        localidad: "VILLA NUEVA",
+        municipio: "TEOTITLAN",
+        distrito: "SANTA MARÍA TEOPOXCO",
+        region: "CAÑADA",
+        responsable: "NOEMI ARAGON ARCOS ALTO",
+        lat: 18.1567,
+        lng: -96.9583,
+      },
+      {
+        id: 29,
+        nombre: "TBC 29",
+        localidad: "SANTA MARIA YOLOTEPEC",
+        municipio: "HUAJUAPAN",
+        distrito: "SANTA MARIA YOLOTEPEC",
+        region: "MIXTECA",
+        responsable: "BENITO SANTIAGO GUERRA",
+        lat: 17.4833,
+        lng: -97.5,
+      },
+      {
+        id: 30,
+        nombre: "TBC 30",
+        localidad: "SANTA CRUZ TIHUIXTE",
+        municipio: "SANTIAGO TETEPEC",
+        distrito: "JAMILTEPEC",
+        region: "COSTA",
+        responsable: "ELISAMAR MEDINA RODRÍGUEZ",
+        lat: 16.3267,
+        lng: -97.7472,
+      },
+
+      {
+        id: 31,
+        nombre: "TBC 31",
+        localidad: "SAN FELIPE LACHILLO",
+        municipio: "MIAHUATLAN",
+        distrito: "SANTIAGO XANICA",
+        region: "SIERRA SUR",
+        responsable: "KARINA MARISOL ZARAGOZA LOPEZ",
+        lat: 15.9317,
+        lng: -96.2625,
+      },
+      {
+        id: 32,
+        nombre: "TBC 32",
+        localidad: "PIEDRA DE AMOLAR",
+        municipio: "SAN MIGUEL SOYALTEPEC",
+        distrito: "TUXTEPEC",
+        region: "CUENCA DEL PAPALOAPAN",
+        responsable: "ARACELI GUTIERREZ CERVANTES",
+        lat: 18.2714,
+        lng: -96.5336,
+      },
+      {
+        id: 33,
+        nombre: "TBC 33",
+        localidad: "LA JOYA",
+        municipio: "TUXTEPEC",
+        distrito: "SANTA MARÍA JACATEPEC",
+        region: "CUENCA DEL PAPALOAPAN",
+        responsable: "OFELIA MARTÍNEZ ALTO",
+        lat: 17.8464,
+        lng: -96.2239,
+      },
+      {
+        id: 34,
+        nombre: "TBC 34",
+        localidad: "SAN LUIS DEL RÍO",
+        municipio: "TLACOLULA DE MATAMOROS",
+        distrito: "TLACOLULA",
+        region: "VALLES CENTRALES",
+        responsable: "YOENA MARTINEZ LUIS",
+        lat: 16.7375,
+        lng: -96.1667,
+      },
+      {
+        id: 35,
+        nombre: "TBC 35",
+        localidad: "SITIO DEL PALMAR",
+        municipio: "SAN LUIS AMATLÁN",
+        distrito: "MIAHUATLAN",
+        region: "SIERRA SUR",
+        responsable: "JACIEL RUIZ",
+        lat: 16.3769,
+        lng: -96.4833,
+      },
+      {
+        id: 36,
+        nombre: "TBC 36",
+        localidad: "LAS FLORES",
+        municipio: "SANTA MARÍA TLAHUITOL TEPEC",
+        distrito: "MIXE",
+        region: "SIERRA NORTE",
+        responsable: "LAURA GISELA VARGAS VASQUEZ",
+        lat: 17.1006,
+        lng: -96.0469,
+      },
+      {
+        id: 37,
+        nombre: "TBC 37",
+        localidad: "SANTA CRUZ BAMBA Y GARRAPATERO",
+        municipio: "SANTO DOMINGO TEHUANTEPEC",
+        distrito: "TEHUANTEPEC",
+        region: "ISTMO",
+        responsable: "EFRAIN BALDES HERRANZ",
+        lat: 16.0333,
+        lng: -95.4167,
+      },
+      {
+        id: 38,
+        nombre: "TBC 38",
+        localidad: "MANCUERNAS",
+        municipio: "SANTIAGO PINOTEPA NACIONAL",
+        distrito: "JAMILTEPEC",
+        region: "COSTA",
+        responsable: "YOLANDA CRUZ GARCÍA",
+        lat: 16.3686,
+        lng: -98.1136,
+      },
+      {
+        id: 39,
+        nombre: "TBC 39",
+        localidad: "LA VICTORIA",
+        municipio: "MATIAS ROMERO DE AVENDAÑO",
+        distrito: "JUCHITAN",
+        region: "ISTMO",
+        responsable: "JOSE BAJANDO CUMPLIDO",
+        lat: 17.0708,
+        lng: -94.975,
+      },
+      {
+        id: 40,
+        nombre: "TBC 40",
+        localidad: "LAS CUEVAS",
+        municipio: "SANTIAGO AMOLTEPEC",
+        distrito: "TLAXIACO",
+        region: "SIERRA SUR",
+        responsable: "ALFONSO RAMIREZ ZAMORA",
+        lat: 16.6347,
+        lng: -97.5133,
+      },
+
+      {
+        id: 41,
+        nombre: "TBC 41",
+        localidad: "SANTA MARIA CANDELARIA",
+        municipio: "SAN CARLOS YAUTEPEC",
+        distrito: "YAUTEPEC",
+        region: "SIERRA SUR",
+        responsable: "ALMA MIJANGOS REYES",
+        lat: 16.5986,
+        lng: -96.0881,
+      },
+      {
+        id: 42,
+        nombre: "TBC 42",
+        localidad: "SAN FRANCISCO YOSOCIUTA",
+        municipio: "HUAJUAPAN DE LEON",
+        distrito: "HUAJUAPAN",
+        region: "MIXTECA",
+        responsable: "CRISTHIAN GUADALUPE CRUZ MANZANO",
+        lat: 17.7053,
+        lng: -97.7289,
+      },
+      {
+        id: 43,
+        nombre: "TBC 43",
+        localidad: "SAN JOSE DEL PEÑASCO",
+        municipio: "MIAHUATLAN",
+        distrito: "MIAHUATLAN DE PORFIRIO DÍAZ",
+        region: "SIERRA SUR",
+        responsable: "CLEOTILDE VENEGAS RODRIGUEZ",
+        lat: 16.3264,
+        lng: -96.6025,
+      },
+      {
+        id: 44,
+        nombre: "TBC 44",
+        localidad: "SANTA ANA RAYON",
+        municipio: "SANTIAGO TAMAZOLA",
+        distrito: "SILACAYO APAM",
+        region: "MIXTECA",
+        responsable: "NOE MARTINEZ MOGOLLAN",
+        lat: 17.6536,
+        lng: -98.2431,
+      },
+      {
+        id: 45,
+        nombre: "TBC 45",
+        localidad: "EL JICARAL",
+        municipio: "JUXTLAHUACA",
+        distrito: "COICOYAN DE LAS FLORES",
+        region: "MIXTECA",
+        responsable: "JUAN SANCHEZ GARCÍA",
+        lat: 17.2797,
+        lng: -98.2611,
+      },
+      {
+        id: 46,
+        nombre: "TBC 46",
+        localidad: "SAN JUAN ZAUTLA",
+        municipio: "SAN PEDRO SOCHIAPAM",
+        distrito: "CUICATLAN",
+        region: "CANADA",
+        responsable: "ERNESTO PÉREZ MITRE MEDINA",
+        lat: 17.8436,
+        lng: -96.7214,
+      },
+      {
+        id: 47,
+        nombre: "TBC 47",
+        localidad: "AGUA DE LA ROSA",
+        municipio: "HUAUTLA DE JIMENEZ",
+        distrito: "TEOTITLAN",
+        region: "CAÑADA",
+        responsable: "LIRIEL LAVIDA SEVERIANO",
+        lat: 18.1567,
+        lng: -96.8522,
+      },
+      {
+        id: 48,
+        nombre: "TBC 48",
+        localidad: "SANTA MARIA TEXCATITLAN",
+        municipio: "CUICATLAN",
+        distrito: "SANTA MARIA TEXCATITLÁN",
+        region: "CAÑADA",
+        responsable: "JUAN MANUEL HERNANDEZ MARISCAL",
+        lat: 17.7214,
+        lng: -97.0461,
+      },
+      {
+        id: 49,
+        nombre: "TBC 49",
+        localidad: "CERRO GORDO",
+        municipio: "POCHUTLA",
+        distrito: "SANTA MARIA TONAMECA",
+        region: "COSTA",
+        responsable: "AQUILINA VÁSQUEZ LÓPEZ",
+        lat: 15.8031,
+        lng: -96.6528,
+      },
+      {
+        id: 50,
+        nombre: "TBC 50",
+        localidad: "RANCHO NUEVO",
+        municipio: "SANTIAGO LLANO GRANDE",
+        distrito: "JAMILTEPEC",
+        region: "COSTA",
+        responsable: "HÉCTOR JESÚS GALVAN CORTES",
+        lat: 16.48,
+        lng: -98.3514,
+      },
+
+      {
+        id: 51,
+        nombre: "TBC 51",
+        localidad: "EL JORDAN",
+        municipio: "TEHUANTEPEC",
+        distrito: "SANTO DOMINGO TEHJANTEPEC",
+        region: "ISTMO",
+        responsable: "JORGE SANCHEZ TOMAS",
+        lat: 16.3764,
+        lng: -95.2042,
+      },
+      {
+        id: 52,
+        nombre: "TBC 52",
+        localidad: "GUIVISÍA",
+        municipio: "JUCHITAN",
+        distrito: "SANTA MARIA PETAPA",
+        region: "ISTMO",
+        responsable: "EDUARDO SANCHEZ ZÁRATE",
+        lat: 16.8208,
+        lng: -95.1097,
+      },
+      {
+        id: 53,
+        nombre: "TBC 53",
+        localidad: "SANTA MARIA NATIVITAS COATLAN",
+        municipio: "TEHUANTEPEC",
+        distrito: "SANTO DOMINGO TEHUANTEPEC",
+        region: "ISTMO",
+        responsable: "ENRIQUE GARCÍA JIMÉNEZ",
+        lat: 16.8583,
+        lng: -95.3583,
+      },
+      {
+        id: 55,
+        nombre: "TBC 55",
+        localidad: "SAN ISIDRO LACHIGUXE",
+        municipio: "TEHUANTEPEC",
+        distrito: "SANTA MARÍA GUIENAGATI",
+        region: "ISTMO",
+        responsable: "VIRIDIANA FRANCISCO MARTINEZ",
+        lat: 16.7333,
+        lng: -95.3167,
+      },
+      {
+        id: 56,
+        nombre: "TBC 56",
+        localidad: "SAN ANDRES SABINILLO",
+        municipio: "HUAJUAPAN",
+        distrito: "SANTO DOMINGO TONALA",
+        region: "MIXTECA",
+        responsable: "GLORIA HERNÁNDEZ MARISCAL",
+        lat: 17.6539,
+        lng: -97.8814,
+      },
+      {
+        id: 57,
+        nombre: "TBC 57",
+        localidad: "SANTO DOMINGO YOLOTEPEC",
+        municipio: "HUAJUAPAN",
+        distrito: "SAN MIGUEL AMATITLÁN",
+        region: "MIXTECA",
+        responsable: "CELESTINO JIMÉNEZ APARICIO",
+        lat: 17.9156,
+        lng: -97.9719,
+      },
+      {
+        id: 58,
+        nombre: "TBC 58",
+        localidad: "SAN SIMON ZAHUATLÁN",
+        municipio: "HUAJUAPAN",
+        distrito: "SAN SIMON ZAHUATLAN",
+        region: "MIXTECA",
+        responsable: "GABRIEL SANDOVAL SOTO",
+        lat: 17.8286,
+        lng: -97.8339,
+      },
+      {
+        id: 59,
+        nombre: "TBC 59",
+        localidad: "MAZIN GRANDE",
+        municipio: "SAN LUCAS OJITLÁN",
+        distrito: "TUXTEPEC",
+        region: "CUENCA DEL PAPALOAPAN",
+        responsable: "VICTORIA HERNÁNDEZ HERRERA",
+        lat: 18.0489,
+        lng: -96.3456,
+      },
+      {
+        id: 60,
+        nombre: "TBC 60",
+        localidad: "SAN JUAN PETLAPA",
+        municipio: "SAN JUAN PETLAPA",
+        distrito: "CHOAPAM",
+        region: "CUENCA DEL PAPALOAPAN",
+        responsable: "GABRIEL PURA OZUNA",
+        lat: 17.4717,
+        lng: -95.9611,
+      },
+
+      {
+        id: 61,
+        nombre: "TBC 61",
+        localidad: "ISLA MALZAGA",
+        municipio: "SAN MIGUEL SOYALTEPEC",
+        distrito: "TUXTEPEC",
+        region: "CUENCA DEL PAPALOAPAN",
+        responsable: "MARTHA GLORIA BASILIO JUAN",
+        lat: 18.2044,
+        lng: -96.4633,
+      },
+      {
+        id: 62,
+        nombre: "TBC 62",
+        localidad: "SANTA CRUZ YAGAVILA",
+        municipio: "IXTLAN DE JUAREZ",
+        distrito: "IXTLAN DE JUÁREZ",
+        region: "SIERRA NORTE",
+        responsable: "TOBIAS MEJIA ALTAMIRANO",
+        lat: 17.3917,
+        lng: -96.3,
+      },
+      {
+        id: 63,
+        nombre: "TBC 63",
+        localidad: "SAN FRANCISCO YOVEGO",
+        municipio: "SANTIAGO CAMOTLAN",
+        distrito: "VILLA ALTA",
+        region: "SIERRA NORTE",
+        responsable: "MARICELA NEGRETE PÉREZ",
+        lat: 17.5122,
+        lng: -95.9525,
+      },
+      {
+        id: 64,
+        nombre: "TBC 64",
+        localidad: "SAN JUAN BOSCO CHUXNABAN",
+        municipio: "MIXE",
+        distrito: "SAN MIGUEL QUETZALTEPEC",
+        region: "SIERRA NORTE",
+        responsable: "ELOINA MERINO JIMÉNEZ",
+        lat: 16.9833,
+        lng: -95.9333,
+      },
+      {
+        id: 65,
+        nombre: "TBC 65",
+        localidad: "ASUNCIÓN TLACOLULITA",
+        municipio: "YALITEPEC",
+        distrito: "ASUNCIÓN TLACOLULITA",
+        region: "SIERRA SUR",
+        responsable: "ANA IRMA CRUZ ESCOBAR",
+        lat: 16.2167,
+        lng: -95.7167,
+      },
+      {
+        id: 66,
+        nombre: "TBC 66",
+        localidad: "BRAMADEROS",
+        municipio: "MIAHUATLAN",
+        distrito: "MIAHUATLÁN DE PORFIRIO DÍAZ",
+        region: "SIERRA SUR",
+        responsable: "JESÚS HERNÁNDEZ LÓPEZ",
+        lat: 16.3622,
+        lng: -96.5414,
+      },
+      {
+        id: 67,
+        nombre: "TBC 67",
+        localidad: "SAN FRANCISCO COATLÁN",
+        municipio: "SAN PABLO COATLAN",
+        distrito: "MIAHUATLAN",
+        region: "SIERRA SUR",
+        responsable: "MARIA GUADALUPE CRUZ ENRIQUEZ",
+        lat: 16.2081,
+        lng: -96.7903,
+      },
+      {
+        id: 68,
+        nombre: "TBC 68",
+        localidad: "SAN ANTONIO LALANA",
+        municipio: "SAN PABLO COATLAN",
+        distrito: "MIAHUATLAN",
+        region: "SIERRA SUR",
+        responsable: "ERICK GARCIA TOLEDO",
+        lat: 16.1667,
+        lng: -96.7333,
+      },
+      {
+        id: 69,
+        nombre: "TBC 69",
+        localidad: "SANTO TOMÁS QUIERI",
+        municipio: "SAN CARLOS YAUTEPEC",
+        distrito: "YAUTEPEC",
+        region: "SIERRA SUR",
+        responsable: "ABDUL FRANCISCO COBO GUZMAN",
+        lat: 16.4025,
+        lng: -95.9686,
+      },
+      {
+        id: 70,
+        nombre: "TBC 70",
+        localidad: "SAN JERONIMO TAVICHE",
+        municipio: "SAN JERONIMO TAVICHE",
+        distrito: "OCOTLAN",
+        region: "VALLES CENTRALES",
+        responsable: "JUAN MARIO MARTINEZ LUCERO",
+        lat: 16.7333,
+        lng: -96.55,
+      },
+      {
+        id: 71,
+        nombre: "TBC 71",
+        localidad: "SANTA CATALINA MIXTEPEC",
+        municipio: "MAGDALENA МІХТЕРЕС",
+        distrito: "ZIMATLAN",
+        region: "VALLES CENTRALES",
+        responsable: "JAVIER IGNACIO PEREZ TORRES",
+        lat: 16.8333,
+        lng: -96.9,
+      },
+      {
+        id: 72,
+        nombre: "TBC 72",
+        localidad: "SAN JUAN LACHIGALLA",
+        municipio: "SAN JUAN LACHIGALLA",
+        distrito: "EJUTLA",
+        region: "VALLES CENTRALES",
+        responsable: "ENDERLIN GONZÁLEZ ÁVILA",
+        lat: 16.5917,
+        lng: -96.5333,
+      },
+      {
+        id: 74,
+        nombre: "TBC 74",
+        localidad: "SANTIAGO IXCUINTEPEC",
+        municipio: "SANTIAGO IXCUINTEPEC",
+        distrito: "MIXE",
+        region: "SIERRA NORTE",
+        responsable: "KARINA ANACLETO MAXIMI ANO",
+        lat: 16.9458,
+        lng: -95.6319,
+      },
+      {
+        id: 75,
+        nombre: "TBC 75",
+        localidad: "CHAPULTEPEC",
+        municipio: "CHALCATONGO DE HIDALGO",
+        distrito: "TLAXIACO",
+        region: "MIXTECA",
+        responsable: "ANABEL LUCIA CORTES JIMENEZ",
+        lat: 17.0258,
+        lng: -97.5819,
+      },
+      {
+        id: 76,
+        nombre: "TBC 76",
+        localidad: "COICOYAN DE LAS FLORES",
+        municipio: "COICOYAN DE LAS FLORES",
+        distrito: "JUXTLAHUACA",
+        region: "MIXTECA",
+        responsable: "GUSTAVO PEÑA BASTOS",
+        lat: 17.2667,
+        lng: -98.2833,
+      },
+      {
+        id: 77,
+        nombre: "TBC 77",
+        localidad: "XADANI",
+        municipio: "GUEVEA DE HUMBOLDT",
+        distrito: "TEHUANTEPEC",
+        region: "ISTMO",
+        responsable: "REY MIGUEL HERNANDEZ AYALA",
+        lat: 16.7844,
+        lng: -95.3683,
+      },
+      {
+        id: 78,
+        nombre: "TBC 78",
+        localidad: "YUCUQUIMI DE OCAMPO",
+        municipio: "HEROICA VILLA DE TEZOATLAN",
+        distrito: "HUAJUAPAN",
+        region: "MIXTECA",
+        responsable: "ANGELA SANTIAGO SANTIAGO",
+        lat: 17.6528,
+        lng: -97.8342,
+      },
+      {
+        id: 79,
+        nombre: "TBC 79",
+        localidad: "PALO DE MARCA",
+        municipio: "HUAUTLA DE JIMÉNEZ",
+        distrito: "TEOTITLAN",
+        region: "CAÑADA",
+        responsable: "TIMOTEO CORTES ZARATE",
+        lat: 18.1067,
+        lng: -96.7911,
+      },
+      {
+        id: 80,
+        nombre: "TBC 80",
+        localidad: "RIO SANTIAGO",
+        municipio: "HUAUTLA DE JIMÉNEZ",
+        distrito: "TEOTITLAN",
+        region: "CAÑADA",
+        responsable: "JOSE FELIX SANTIAGO",
+        lat: 18.1408,
+        lng: -96.8122,
+      },
+
+      {
+        id: 81,
+        nombre: "TBC 81",
+        localidad: "SANTA CATARINA BUENA VISTA",
+        municipio: "HUAUTLA DE JIMÉNEZ",
+        distrito: "TEOTITLAN",
+        region: "CAÑADA",
+        responsable: "ALONSO ZAMORA REYES",
+        lat: 18.1158,
+        lng: -96.7942,
+      },
+      {
+        id: 82,
+        nombre: "TBC 82",
+        localidad: "LLANO VERIA",
+        municipio: "SANTA MARÍA JALAPA DEL MARQUES",
+        distrito: "TEHUANTEPEC",
+        region: "ISTMO",
+        responsable: "GABRIEL GÓMEZ PÉREZ",
+        lat: 16.5161,
+        lng: -95.385,
+      },
+      {
+        id: 83,
+        nombre: "TBC 83",
+        localidad: "POCHOTEPEC",
+        municipio: "MAZATLAN VILLA DE FLORES",
+        distrito: "TEOTITLAN",
+        region: "CAÑADA",
+        responsable: "MAGALI GOMEZ CRUZ",
+        lat: 18.0436,
+        lng: -96.9011,
+      },
+      {
+        id: 84,
+        nombre: "TBC 84",
+        localidad: "SAN AGUSTÍN ETLA",
+        municipio: "SAN AGUSTIN ETLA",
+        distrito: "ETLA",
+        region: "VALLES CENTRALES",
+        responsable: "ELBA DONAJI GARCÍA AVILA",
+        lat: 17.1833,
+        lng: -96.7667,
+      },
+      {
+        id: 85,
+        nombre: "TBC 85",
+        localidad: "SANTIAGO LACHIVIA",
+        municipio: "SAN CARLOS YAUTEPEC",
+        distrito: "YAUTEPEC",
+        region: "SIERRA SUR",
+        responsable: "GREGORIO ADOLFO ZARATE LÓPEZ",
+        lat: 16.5408,
+        lng: -96.0628,
+      },
+      {
+        id: 86,
+        nombre: "TBC 86",
+        localidad: "SANTIAGO QUIAVICUZAS",
+        municipio: "SAN CARLOS YAUTEPEC",
+        distrito: "YAUTEPEC",
+        region: "SIERRA SUR",
+        responsable: "GEMA NALLELI SANCHEZ MERINO",
+        lat: 16.4833,
+        lng: -95.95,
+      },
+      {
+        id: 87,
+        nombre: "TBC 87",
+        localidad: "LA SORPRESA",
+        municipio: "SAN FELIPE JALAPA DE DIAZ",
+        distrito: "TUXTEPEC",
+        region: "CUENCA DEL PAPALOAPAN",
+        responsable: "ALBERTO MARTINEZ JARQUIN",
+        lat: 18.0697,
+        lng: -96.5367,
+      },
+      {
+        id: 88,
+        nombre: "TBC 88",
+        localidad: "SAN JUAN LACHAO PUEBLO VIEJO",
+        municipio: "SAN JUAN LACHAO",
+        distrito: "JUQUILA",
+        region: "COSTA",
+        responsable: "SOLEDAD GARCIA SERRANO",
+        lat: 16.2167,
+        lng: -97.1167,
+      },
+      {
+        id: 89,
+        nombre: "TBC 89",
+        localidad: "SAN JUAN MONTE FLOR",
+        municipio: "SAN JUAN TAMAZOLA",
+        distrito: "NOCHIXTLAN",
+        region: "MIXTECA",
+        responsable: "HÉCTOR GABRIEL RUIZ",
+        lat: 17.3167,
+        lng: -97.2333,
+      },
+      {
+        id: 90,
+        nombre: "TBC 90",
+        localidad: "YUTANDAYOO",
+        municipio: "SAN PEDRO JICAYAN",
+        distrito: "JAMILTEPEC",
+        region: "COSTA",
+        responsable: "REY REY NA SÁNCHEZ",
+        lat: 16.4486,
+        lng: -98.0561,
+      },
+      {
+        id: 91,
+        nombre: "TBC 91",
+        localidad: "SAN MIGUEL FIGUEROA",
+        municipio: "SAN PEDRO POCHUTLA",
+        distrito: "POCHUTLA",
+        region: "COSTA",
+        responsable: "JERITZA ISABEL PINA ARANGO",
+        lat: 15.8208,
+        lng: -96.3986,
+      },
+      {
+        id: 92,
+        nombre: "TBC 92",
+        localidad: "SANTA MARÍA CAMOTLAN",
+        municipio: "SANTA MARIA CAMOTLAN",
+        distrito: "HUAJUAPAN",
+        region: "MIXTECA",
+        responsable: "ANGEL LARA REYES",
+        lat: 17.9,
+        lng: -97.6667,
+      },
+      {
+        id: 93,
+        nombre: "TBC 93",
+        localidad: "SAN FRANCISCO",
+        municipio: "SANTA MARIA CHILCHOTLA",
+        distrito: "TEOTITLAN",
+        region: "CAÑADA",
+        responsable: "JACINTO JIMENEZ CRUZ",
+        lat: 18.2314,
+        lng: -96.8189,
+      },
+      {
+        id: 94,
+        nombre: "TBC 94",
+        localidad: "EL MAMEY",
+        municipio: "SANTIAGO AMOLTEPEC",
+        distrito: "SOLA DE VEGA",
+        region: "SIERRA SUR",
+        responsable: "VIRGINIA LOPEZ LÓPEZ",
+        lat: 16.6333,
+        lng: -97.5,
+      },
+      {
+        id: 95,
+        nombre: "TBC 95",
+        localidad: "ESTANCIA DE MORELOS",
+        municipio: "SANTIAGO ATITLAN",
+        distrito: "MIXE",
+        region: "SIERRA NORTE",
+        responsable: "RUBEN PÉREZ LÓPEZ",
+        lat: 17.1519,
+        lng: -95.9189,
+      },
+      {
+        id: 96,
+        nombre: "TBC 96",
+        localidad: "VILLA NUEVA",
+        municipio: "SANTIAGO IXTAYUTLA",
+        distrito: "JAMILTEPEC",
+        region: "COSTA",
+        responsable: "ANA LILIA CRUZ MARTINEZ",
+        lat: 16.4639,
+        lng: -97.8011,
+      },
+      {
+        id: 97,
+        nombre: "TBC 97",
+        localidad: "SAN SEBASTIAN DEL MONTE",
+        municipio: "SANTO DOMINGO TONALA",
+        distrito: "HUAJUAPAN",
+        region: "MIXTECA",
+        responsable: "HIGINIO DE LA CRUZ NOLASCO",
+        lat: 17.6256,
+        lng: -97.9861,
+      },
+      {
+        id: 98,
+        nombre: "TBC 98",
+        localidad: "SAN MIGUEL DEL VALLE",
+        municipio: "VILLA DÍAZ ORDÁZ",
+        distrito: "TLACOLULA",
+        region: "VALLES CENTRALES",
+        responsable: "PORFIRIO EFREN MENDEZ BARRI GA",
+        lat: 17.0667,
+        lng: -96.4167,
+      },
+      {
+        id: 100,
+        nombre: "TBC 100",
+        localidad: "YOGANA",
+        municipio: "YOGANA",
+        distrito: "EJUTLA",
+        region: "VALLES CENTRALES",
+        responsable: "MAGALY COMONFORT BARTOLO",
+        lat: 16.4,
+        lng: -96.6667,
+      },
+      {
+        id: 101,
+        nombre: "TBC 101",
+        localidad: "LA LUZ",
+        municipio: "VILLA DE SAN PEDRO TUTUTEPEC",
+        distrito: "JUQUILA",
+        region: "COSTA",
+        responsable: "ARMANDO CRUZ HERNANDEZ",
+        lat: 16.0372,
+        lng: -97.4386,
+      },
+      {
+        id: 102,
+        nombre: "TBC 102",
+        localidad: "EL VERGEL",
+        municipio: "HEROICA CIUDAD DE EJUTLA DE CRESPO",
+        distrito: "EJUTLA",
+        region: "VALLES CENTRALES",
+        responsable: "NANCY CASTILLO CAMARILLO",
+        lat: 16.5167,
+        lng: -96.7167,
+      },
+      {
+        id: 103,
+        nombre: "Polivirtual",
+        localidad: "EL ESPINAL",
+        municipio: "EL ESPINAL",
+        distrito: "JUCHITAN",
+        region: "ISTMO",
+        responsable: "POR DEFINIR",
+        lat: 16.4833,
+        lng: -95.0417,
+      },
+      {
+        id: 104,
+        nombre: "Polivirtual",
+        localidad: "SAN JUAN GUICHICOVI",
+        municipio: "SAN JUAN GUICHICOVI",
+        distrito: "JUCHITAN",
+        region: "ISTMO",
+        responsable: "POR DEFINIR",
+        lat: 16.9603,
+        lng: -95.0939,
+      },
+      {
+        id: 105,
+        nombre: "Polivirtual",
+        localidad: "TLACOLULA DE MATAMOROS",
+        municipio: "TLACOLULA DE MATAMOROS",
+        distrito: "TLACOLULA",
+        region: "VALLES CENTRALES",
+        responsable: "POR DEFINIR",
+        lat: 16.9500,
+        lng: -96.4667,
+      },
+      {
+        id: 106,
+        nombre: "Polivirtual",
+        localidad: "SANTA MARÍA CORTIJO",
+        municipio: "SANTA MARÍA CORTIJO",
+        distrito: "JAMILTEPEC",
+        region: "COSTA",
+        responsable: "POR DEFINIR",
+        lat: 16.4739,
+        lng: -98.4486,
+      },
+    ];
+
+    // 4. Lógica para agregar capas, marcadores y red de distancia
+    let puntoEnfoque = null;
+
+    // Configurar mapas base
+    const capaClara = L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+      attribution: "© CARTO", subdomains: 'abcd', maxZoom: 20
+    });
+    
+    const capaSatelite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      attribution: '© Esri', maxZoom: 19
+    });
+
+    const mapasBase = {
+      "Mapa Claro (Territorio)": capaClara,
+      "Mapa Satelital (Relieve)": capaSatelite
+    };
+
+    // Crear grupos de superposición
+    const grupoAreas = L.layerGroup().addTo(map);
+    const grupoRedes = L.layerGroup().addTo(map);
+    const grupoPolivirtual = L.layerGroup().addTo(map);
+    const grupoTBC = L.layerGroup().addTo(map);
+
+    const superposiciones = {
+      "Sedes Polivirtual": grupoPolivirtual,
+      "Planteles TBC": grupoTBC,
+      "Áreas de Cobertura (30km)": grupoAreas,
+      "Líneas de Red (Conectividad)": grupoRedes
+    };
+
+    // Agregar control de capas al mapa
+    map.eachLayer((layer) => { if(layer instanceof L.TileLayer) map.removeLayer(layer); });
+    capaClara.addTo(map);
+    L.control.layers(mapasBase, superposiciones, { position: 'topright' }).addTo(map);
+
+    // Separar y procesar datos
+    const sedesPoli = planteles.filter(p => p.nombre.includes("Polivirtual"));
+    const sedesTbc = planteles.filter(p => !p.nombre.includes("Polivirtual"));
+
+    // Procesar Sedes Polivirtual
+    sedesPoli.forEach((poli) => {
+        const latlng = [poli.lat, poli.lng];
+        const esMiMunicipio = poli.municipio === MI_MUNICIPIO_IMPLEMENTACION;
+
+        if (esMiMunicipio) puntoEnfoque = latlng;
+
+        // Radio 30km
+        L.circle(latlng, {
+            radius: 30000,
+            color: "#6A1B31",
+            weight: 1.5,
+            opacity: 0.6,
+            fillColor: "#6A1B31",
+            fillOpacity: 0.05,
+            dashArray: "5, 5"
+        }).addTo(grupoAreas);
+
+        // Marcador
+        let marker;
+        if (esMiMunicipio) {
+            // Sede estática destacada dorada
+            const pulseIcon = L.divIcon({ className: 'pulse-marker', iconSize: [20, 20], iconAnchor: [10, 10] });
+            marker = L.marker(latlng, { icon: pulseIcon, zIndexOffset: 2000 }).addTo(grupoPolivirtual);
+        } else {
+            marker = L.circleMarker(latlng, {
+                radius: 7, fillColor: "#6A1B31", color: "#ffffff", weight: 2, opacity: 1, fillOpacity: 1
+            }).addTo(grupoPolivirtual);
+        }
+
+        const tituloPopup = esMiMunicipio ? "⭐ Polivirtual en tu municipio" : poli.nombre;
+        marker.bindPopup(`
+            <div class="popup-header">
+                ${tituloPopup}
+            </div>
+            <div class="popup-body" style="min-width: 250px;">
+                <b>Localidad:</b> ${poli.localidad}<br>
+                <b>Municipio:</b> ${poli.municipio}<br>
+                <div class="badge ipn" style="margin-top: 8px;"><i class="fas fa-laptop-code"></i> Aula Conectada</div>
+                <div class="badge ipn" style="margin-top: 8px;"><i class="fas fa-graduation-cap"></i> Modalidad No Escolarizada</div>
+                <button class="btn-detalle" onclick="abrirModalPolivirtual()">
+                    <i class="fas fa-info-circle"></i> Ver Oferta y Detalles
+                </button>
+            </div>
+        `);
+    });
+
+    // Procesar TBCs
+    sedesTbc.forEach((tbc) => {
+        const latlngTbc = [tbc.lat, tbc.lng];
+
+        // Buscar polivirtual más cercano para conformar la red
+        let poliCercano = null;
+        let distMinima = Infinity;
+
+        sedesPoli.forEach(poli => {
+            const latlngPoli = L.latLng(poli.lat, poli.lng);
+            const dist = latlngPoli.distanceTo(L.latLng(tbc.lat, tbc.lng));
+            if(dist < distMinima) { distMinima = dist; poliCercano = poli; }
+        });
+
+        // Trazar línea de visión permanente si está en un radio razonable
+        if(poliCercano && distMinima < 80000) {
+            L.polyline([latlngTbc, [poliCercano.lat, poliCercano.lng]], {
+                color: '#8e44ad', weight: 1.5, opacity: 0.6, dashArray: '4,6'
+            }).bindTooltip((distMinima/1000).toFixed(1) + " km", { permanent: true, direction: "center", className: "dist-label" }).addTo(grupoRedes);
+        }
+
+        // Marcador TBC
+        const marker = L.circleMarker(latlngTbc, {
+            radius: 5, fillColor: "#27ae60", color: "#ffffff", weight: 1.5, opacity: 1, fillOpacity: 0.8
+        }).addTo(grupoTBC);
+
+        marker.bindPopup(`
+            <div class="popup-header tbc">
+                ${tbc.nombre}
+            </div>
+            <div class="popup-body" style="min-width: 220px;">
+                <b>Localidad:</b> ${tbc.localidad}<br>
+                <b>Municipio:</b> ${tbc.municipio}<br>
+                <b>Responsable:</b> ${tbc.responsable}<br>
+                <b>Matrícula Estimada:</b> ~50 alumnos<br>
+                  ${poliCercano ? '<span style="color:#2c3e50; display:block; margin-top:8px; font-size:11px; padding:6px; background:#f4f6f9; border-radius:4px; border: 1px solid #e2e8f0;"><i class="fas fa-link" style="color: #8e44ad;"></i> <b>Polivirtual Asignado:</b><br/> ' + poliCercano.nombre + ' (' + (distMinima/1000).toFixed(1) + ' km aprox)</span>' : ''}
+            </div>
+        `);
+    });
+
+    // Vuelo automático hacia el municipio de implementación al cargar el mapa
+    if (puntoEnfoque) {
+      setTimeout(() => {
+        map.flyTo(puntoEnfoque, 10, {
+          duration: 2.5, 
+          easeLinearity: 0.25
+        });
+      }, 1200); 
+    }
+
+    // --- LÓGICA DE SIMULADOR DSS (TOMA DE DECISIONES) ---
+    let modoSimulacion = false;
+    let marcadorSimulado = null;
+    let areaSimulada = null;
+    let lineasSimuladas = L.layerGroup().addTo(map);
+
+    function toggleSimulacion() {
+      const btn = document.getElementById("btnSimular");
+      modoSimulacion = !modoSimulacion;
+      
+      if (modoSimulacion) {
+        btn.classList.add("active");
+        btn.innerHTML = '<i class="fas fa-times"></i> Desactivar Simulador';
+        document.querySelector('.leaflet-container').style.cursor = 'crosshair';
+        map.on('click', realizarSimulacion);
+        
+        // Mostrar popup instructivo inicial
+        L.popup().setLatLng(map.getCenter()).setContent('<b>Modo Simulación Activo</b><br>Haz clic en cualquier punto del mapa para proyectar una nueva sede y calcular su impacto.').openOn(map);
+      } else {
+        btn.classList.remove("active");
+        btn.innerHTML = '<i class="fas fa-map-marker-alt"></i> Activar Modo Simulación';
+        document.querySelector('.leaflet-container').style.cursor = '';
+        map.off('click', realizarSimulacion);
+        
+        if (marcadorSimulado) map.removeLayer(marcadorSimulado);
+        if (areaSimulada) map.removeLayer(areaSimulada);
+        lineasSimuladas.clearLayers();
+        map.closePopup();
+      }
+    }
+
+    function realizarSimulacion(e) {
+      if (!modoSimulacion) return;
+      if (marcadorSimulado) map.removeLayer(marcadorSimulado);
+      if (areaSimulada) map.removeLayer(areaSimulada);
+      lineasSimuladas.clearLayers();
+
+      const latlngNueva = e.latlng;
+      const radioElegido = parseInt(document.getElementById('radioSimulacion').value);
+
+      // Dibujar área de influencia dinámica
+      areaSimulada = L.circle(latlngNueva, {
+        radius: radioElegido, color: "#3498db", weight: 2, opacity: 0.8,
+        fillColor: "#3498db", fillOpacity: 0.1, dashArray: "5, 5"
+      }).addTo(map);
+
+      // Icono de simulación
+      const simIcon = L.divIcon({ 
+        className: 'custom-div-icon', 
+        html: '<div style="background:#3498db; width:18px; height:18px; border-radius:50%; border:3px solid white; box-shadow:0 0 10px rgba(52,152,219,0.8);"></div>', 
+        iconSize: [24, 24], iconAnchor: [12, 12] 
+      });
+      marcadorSimulado = L.marker(latlngNueva, { icon: simIcon, zIndexOffset: 3000 }).addTo(map);
+
+      // Calcular Impacto en vivo
+      let tbcsBeneficiados = 0;
+      let distanciaVisual = radioElegido + 10000; // Lineas conectivas visuales
+
+      sedesTbc.forEach(tbc => {
+        const dist = latlngNueva.distanceTo([tbc.lat, tbc.lng]);
+        if (dist <= radioElegido) tbcsBeneficiados++;
+        
+        if (dist <= distanciaVisual) {
+          L.polyline([latlngNueva, [tbc.lat, tbc.lng]], {
+            color: '#3498db', weight: 2, opacity: 0.5, dashArray: '3,5'
+          }).bindTooltip((dist/1000).toFixed(1) + " km", { permanent: true, direction: "center", className: "dist-label sim" }).addTo(lineasSimuladas);
+        }
+      });
+
+      const alumnosEstimados = tbcsBeneficiados * 50; 
+
+      marcadorSimulado.bindPopup(`
+        <div class="popup-header" style="background: #3498db; margin: -1px;">
+          <i class="fas fa-magic"></i> Evaluación de Expansión
+        </div>
+        <div class="popup-body" style="min-width: 230px;">
+          <h4 style="margin:0 0 10px 0; color:#2c3e50; font-size:13px;">Proyección en radio de ${(radioElegido/1000)}km</h4>
+          <b><i class="fas fa-school" style="color:#27ae60;"></i> Planteles TBC Alcanzados:</b> <span style="font-size:16px; font-weight:bold; color:#3498db;">${tbcsBeneficiados}</span><br>
+          <hr style="border: 0; border-top: 1px solid #ddd; margin: 10px 0;">
+          <b><i class="fas fa-users" style="color:#6A1B31;"></i> Matrícula Impactada:</b> <span style="font-size:16px; font-weight:bold; color:#3498db;">~${alumnosEstimados}</span> alumnos<br>
+          <p style="font-size:10px; color:#777; margin-top:10px; line-height:1.3; border-top: 1px dashed #ccc; padding-top: 8px;">
+            Haz clic en cualquier otro lugar del mapa para recalcular el beneficio logístico de otra ubicación.
+          </p>
+        </div>
+      `).openPopup();
+    }
+
+    function abrirModalPolivirtual() {
+      document.getElementById('modalPolivirtual').classList.add('active');
+    }
+    function cerrarModalPolivirtual() {
+      document.getElementById('modalPolivirtual').classList.remove('active');
+    }
+  </script>
+
+  <!-- HTML del Modal -->
+  <div class="modal-overlay" id="modalPolivirtual" onclick="if(event.target === this) cerrarModalPolivirtual()">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2><i class="fas fa-university"></i> Polivirtual en tu Municipio</h2>
+        <button class="close-btn" onclick="cerrarModalPolivirtual()">&times;</button>
+      </div>
+      <div class="modal-body">
+        
+        <div class="modal-section" style="margin-bottom: 20px; border-left-color: var(--tbc-verde);">
+          <h3>¿Qué es el Polivirtual?</h3>
+          <p>Es el sistema del <b>Instituto Politécnico Nacional (IPN)</b> mediante el cual se imparten estudios de bachillerato y licenciatura en la modalidad no escolarizada con apoyo de tecnología.</p>
+          <ul>
+            <li><b>Estudio a distancia y gratuito:</b> Los alumnos están inscritos en una Unidad Académica del IPN.</li>
+            <li><b>Flexibilidad de horarios:</b> Permite estudiar sin descuidar el trabajo o la familia.</li>
+            <li><b>Validez oficial:</b> Mismo reconocimiento ante el IPN y la SEP que la modalidad presencial.</li>
+            <li><b>Mismos beneficios:</b> Todos los derechos y beneficios de los alumnos presenciales.</li>
+          </ul>
+        </div>
+
+        <div class="modal-grid">
+          <div class="modal-section">
+            <h3><i class="fas fa-graduation-cap"></i> Nivel Superior</h3>
+            <p><i>(9 Licenciaturas y 1 Ingeniería)</i></p>
+            <ul>
+              <li>Lic. en Archivonomía</li>
+              <li>Lic. en Biblioteconomía</li>
+              <li>Lic. en Administración y Desarrollo Empresarial</li>
+              <li>Lic. en Comercio Internacional</li>
+              <li>Lic. en Relaciones Comerciales</li>
+              <li>Lic. en Negocios Internacionales</li>
+              <li>Contador Público</li>
+              <li>Lic. en Contaduría y Finanzas Públicas</li>
+              <li>Lic. en Turismo <i>(Inicio agosto 2026)</i></li>
+              <li>Ing. en Negocios Energéticos</li>
+            </ul>
+          </div>
+          
+          <div class="modal-section">
+            <h3><i class="fas fa-laptop-code"></i> Nivel Medio Superior</h3>
+            <p><i>(15 Carreras Técnicas y 1 Bachillerato)</i></p>
+            <ul>
+              <li>Téc. en Administración, Recursos Humanos</li>
+              <li>Téc. en Comercio Internacional</li>
+              <li>Téc. en Computación, Desarrollo Software</li>
+              <li>Téc. en Construcción</li>
+              <li>Téc. en Diagnóstico/Mejoramiento Ambiental</li>
+              <li>Téc. en Diseño Gráfico Digital</li>
+              <li>Téc. en Informática, Sistemas</li>
+              <li>Téc. en Mercadotecnia</li>
+              <li>Téc. en Químico Farmacéutico</li>
+              <li>Téc. en Soldadura, Telecomunicaciones</li>
+              <li>Téc. en Nutrición Humana</li>
+              <li><b>Bachillerato General</b></li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="modal-grid">
+          <div class="modal-section" style="border-left-color: #3498db;">
+            <h3><i class="fas fa-users"></i> Acompañamiento y Ventajas</h3>
+            <p><b>¿Quiénes te acompañan?</b></p>
+            <ul>
+              <li><b>Asesores:</b> En la parte académica.</li>
+              <li><b>Tutores NS:</b> Trayectoria y gestión administrativa.</li>
+              <li><b>Jefe de UTEyCV:</b> Solicitudes especiales.</li>
+              <li><b>Compañeros:</b> Desarrollo académico.</li>
+              <li><b>Atención a Usuarios:</b> Asesoría técnica.</li>
+            </ul>
+            <p style="margin-top:10px;"><b>Ventajas:</b> Calidad y reconocimiento, desarrollo de habilidades, flexibilidad de tiempo/espacio y acompañamiento constante.</p>
+          </div>
+
+          <div class="modal-section" style="border-left-color: #e67e22;">
+            <h3><i class="fas fa-handshake"></i> Alianza Estratégica (Responsabilidades)</h3>
+            <p>Operado entre el IPN y el Gobierno Estatal/Municipal.</p>
+            <p><b>Responsabilidades IPN:</b></p>
+            <ul>
+              <li>Educación superior de alta calidad s/costo.</li>
+              <li>Becas, seguro médico/vida para alumnos.</li>
+            </ul>
+            <p style="margin-top:10px;"><b>Responsabilidades Municipio:</b></p>
+            <ul>
+              <li>Habilitar aula física/instalaciones (presenciales/culturales).</li>
+              <li>Equipos de cómputo con internet de alta velocidad.</li>
+              <li>Enlace IPN, docentes de apoyo, seguridad y limpieza.</li>
+            </ul>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</body>
+</html>
