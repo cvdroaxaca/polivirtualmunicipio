@@ -1659,15 +1659,18 @@
             if(dist < distMinima) { distMinima = dist; poliCercano = poli; }
         });
 
+        // Aplicar factor de tortuosidad (1.4x) para rutas de carretera en montañas/sierra
+        let distRealAprox = distMinima * 1.4;
+
         // Trazar línea de visión permanente si está en un radio razonable
         if(poliCercano && distMinima < 80000) {
             L.polyline([latlngTbc, [poliCercano.lat, poliCercano.lng]], {
                 color: '#8e44ad', weight: 1.5, opacity: 0.6, dashArray: '4,6'
-            }).bindTooltip("Conexión: " + (distMinima/1000).toFixed(1) + " km").addTo(grupoRedes);
+            }).bindTooltip("Ruta aprox: " + (distRealAprox/1000).toFixed(1) + " km").addTo(grupoRedes);
 
             // Agregar la etiqueta a la capa opcional para kilometraje permanente
             let midLatLng = [(tbc.lat + poliCercano.lat)/2, (tbc.lng + poliCercano.lng)/2];
-            const labelIcon = L.divIcon({ className: "dist-label", html: (distMinima/1000).toFixed(1) + " km", iconSize: [45, 15], iconAnchor: [22, 7] });
+            const labelIcon = L.divIcon({ className: "dist-label", html: "~" + (distRealAprox/1000).toFixed(1) + " km", iconSize: [50, 15], iconAnchor: [25, 7] });
             L.marker(midLatLng, { icon: labelIcon, interactive: false }).addTo(grupoEtiquetas);
         }
 
@@ -1685,7 +1688,7 @@
                 <b>Municipio:</b> ${tbc.municipio}<br>
                 <b>Responsable:</b> ${tbc.responsable}<br>
                 <b>Matrícula Estimada:</b> ~50 alumnos<br>
-                  ${poliCercano ? '<span style="color:#2c3e50; display:block; margin-top:8px; font-size:11px; padding:6px; background:#f4f6f9; border-radius:4px; border: 1px solid #e2e8f0;"><i class="fas fa-link" style="color: #8e44ad;"></i> <b>Polivirtual Asignado:</b><br/> ' + poliCercano.nombre + ' (' + (distMinima/1000).toFixed(1) + ' km aprox)</span>' : ''}
+                  ${poliCercano ? '<span style="color:#2c3e50; display:block; margin-top:8px; font-size:11px; padding:6px; background:#f4f6f9; border-radius:4px; border: 1px solid #e2e8f0;"><i class="fas fa-route" style="color: #8e44ad;"></i> <b>Polivirtual Asignado:</b><br/> ' + poliCercano.nombre + ' (~' + (distRealAprox/1000).toFixed(1) + ' km de ruta est.)</span>' : ''}
             </div>
         `);
     });
@@ -1763,9 +1766,10 @@
         if (dist <= radioElegido) tbcsBeneficiados++;
         
         if (dist <= distanciaVisual) {
+          let distAproxRuta = (dist * 1.4) / 1000;
           L.polyline([latlngNueva, [tbc.lat, tbc.lng]], {
             color: '#3498db', weight: 2, opacity: 0.5, dashArray: '3,5'
-          }).bindTooltip((dist/1000).toFixed(1) + " km", { permanent: true, direction: "center", className: "dist-label sim" }).addTo(lineasSimuladas);
+          }).bindTooltip("~" + distAproxRuta.toFixed(1) + " km", { permanent: true, direction: "center", className: "dist-label sim" }).addTo(lineasSimuladas);
         }
       });
 
