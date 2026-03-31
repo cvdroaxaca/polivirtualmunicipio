@@ -379,10 +379,6 @@
           <span>Sede Polivirtual (IPN)</span>
         </div>
         <div class="legend-item">
-          <div class="legend-dot" style="background: var(--ipn-guinda); border: 2px solid white; box-shadow: 0 0 5px rgba(106, 27, 49, 0.4); width: 14px; height: 14px; box-sizing: border-box;"></div>
-          <span>Polivirtual en tu municipio</span>
-        </div>
-        <div class="legend-item">
           <div class="legend-dot" style="background: rgba(106, 27, 49, 0.1); border: 1px dashed var(--ipn-guinda);">
           </div>
           <span>Zona de Cobertura e Influencia (30km)</span>
@@ -391,9 +387,6 @@
           <div style="width: 14px; height: 3px; background: #8e44ad; border-bottom: 2px dashed rgba(255,255,255,0.7); margin-right: 8px; flex-shrink: 0;"></div>
           <span>Red Estratégica (Conexión a Sede IDEAL)</span>
         </div>
-        <p style="font-size: 10px; color: #888; margin: 10px 0 0 0; font-style: italic;">
-          Nota: Los marcadores dorados representan la fase inicial supervisada.
-        </p>
       </div>
     </div>
 
@@ -1585,12 +1578,14 @@
     const grupoRedes = L.layerGroup().addTo(map);
     const grupoPolivirtual = L.layerGroup().addTo(map);
     const grupoTBC = L.layerGroup().addTo(map);
+    const grupoEtiquetas = L.layerGroup(); // Capa oculta por defecto para evitar sobrecarga visual
 
     const superposiciones = {
       "Sedes Polivirtual": grupoPolivirtual,
       "Planteles TBC": grupoTBC,
       "Áreas de Cobertura (30km)": grupoAreas,
-      "Líneas de Red (Conectividad)": grupoRedes
+      "Líneas de Red (Conectividad)": grupoRedes,
+      "Anotaciones de Distancias (km)": grupoEtiquetas
     };
 
     // Agregar control de capas al mapa
@@ -1667,7 +1662,12 @@
         if(poliCercano && distMinima < 80000) {
             L.polyline([latlngTbc, [poliCercano.lat, poliCercano.lng]], {
                 color: '#8e44ad', weight: 1.5, opacity: 0.6, dashArray: '4,6'
-            }).bindTooltip((distMinima/1000).toFixed(1) + " km", { permanent: true, direction: "center", className: "dist-label" }).addTo(grupoRedes);
+            }).bindTooltip("Conexión: " + (distMinima/1000).toFixed(1) + " km").addTo(grupoRedes);
+
+            // Agregar la etiqueta a la capa opcional para kilometraje permanente
+            let midLatLng = [(tbc.lat + poliCercano.lat)/2, (tbc.lng + poliCercano.lng)/2];
+            const labelIcon = L.divIcon({ className: "dist-label", html: (distMinima/1000).toFixed(1) + " km", iconSize: [45, 15], iconAnchor: [22, 7] });
+            L.marker(midLatLng, { icon: labelIcon, interactive: false }).addTo(grupoEtiquetas);
         }
 
         // Marcador TBC
